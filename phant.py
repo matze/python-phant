@@ -7,6 +7,11 @@ def only_strings_in(iterable):
     return all((isinstance(x, (str, unicode)) for x in iterable))
 
 
+def check_json_response(response):
+    if isinstance(response, dict) and not response['success']:
+        raise ValueError(response['message'])
+
+
 class Phant(object):
 
     def __init__(self, public_key, *fields, **kwargs):
@@ -30,13 +35,10 @@ class Phant(object):
         """Log arguments. *args must match the fields."""
         params = {'private_key': self.private_key}
         params.update(dict((k, v) for k, v in zip(self._fields, args)))
-        r = rq.post(self._get_url('input'), params=params)
-        response = r.json()
+        response = rq.post(self._get_url('input'), params=params)
+        check_json_response(response.json())
 
-        if not response['success']:
-            raise ValueError(response['message'])
-
-        self._last_headers = r.headers
+        self._last_headers = response.headers
         self._stats = None
 
     def get(self, convert_timestamp=True):
@@ -46,15 +48,16 @@ class Phant(object):
         If *convert_timestamp* is False, the timestamps will not be converted to
         datetime.datetime objects.
         """
-        data = rq.get(self._get_url('output')).json()
+        response = rq.get(self._get_url('output')).json()
+        check_json_response(response)
 
         if convert_timestamp:
             pattern = '%Y-%m-%dT%H:%M:%S.%fZ'
-            for entry in data:
+            for entry in response:
                 timestamp = entry['timestamp']
                 entry['timestamp'] = datetime.datetime.strptime(timestamp, pattern)
 
-        return data
+        return response
 
     @property
     def remaining_requests(self):
