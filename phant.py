@@ -33,6 +33,7 @@ class Phant(object):
 
     def log(self, *args):
         """Log arguments. *args must match the fields."""
+        self._check_private_key("log data")
         params = {'private_key': self.private_key}
         params.update(dict((k, v) for k, v in zip(self._fields, args)))
         response = rq.post(self._get_url('input'), params=params)
@@ -40,6 +41,11 @@ class Phant(object):
 
         self._last_headers = response.headers
         self._stats = None
+
+    def clear(self):
+        self._check_private_key("clear data")
+        headers = {'Phant-Private-Key': self.private_key}
+        rq.delete(self._get_url('input', ext=''), headers=headers)
 
     def get(self, convert_timestamp=True):
         """
@@ -88,6 +94,10 @@ class Phant(object):
     def cap(self):
         """Stream limit."""
         return self._get_stat('cap')
+
+    def _check_private_key(self, message):
+        if not self.private_key:
+            raise ValueError("Must create Phant object with private_key to {}".format(message))
 
     def _get_url(self, command, ext='.json'):
         return os.path.join(self.base_url, command, self.public_key) + ext
