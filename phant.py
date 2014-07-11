@@ -32,7 +32,10 @@ class Phant(object):
         self._last_headers = None
 
     def log(self, *args):
-        """Log arguments. *args must match the fields."""
+        """
+        Log arguments. args must match the fields and the object must be
+        created with a *private_key*.
+        """
         self._check_private_key("log data")
         params = {'private_key': self.private_key}
         params.update(dict((k, v) for k, v in zip(self._fields, args)))
@@ -43,6 +46,9 @@ class Phant(object):
         self._stats = None
 
     def clear(self):
+        """
+        Clear data from stream. Object must be created with a *private_key*.
+        """
         self._check_private_key("clear data")
         headers = {'Phant-Private-Key': self.private_key}
         rq.delete(self._get_url('input', ext=''), headers=headers)
