@@ -29,7 +29,7 @@ class Phant(object):
     def log(self, *args):
         """Log arguments. *args must match the fields."""
         params = {'private_key': self.private_key}
-        params.update(dict((k, v) for k, v in zip(self.fields, args)))
+        params.update(dict((k, v) for k, v in zip(self._fields, args)))
         r = rq.post(self._get_url('input'), params=params)
         response = r.json()
 
