@@ -4,6 +4,15 @@ A Python client library for Phant. See
 [data.sparkfun.com](https://data.sparkfun.com/) for more information.
 
 
+### Installation
+
+Either
+
+* copy the `phant.py` module into you source tree or
+* run `python setup.py install` or
+* install with `pip install phant`.
+
+
 ### Usage
 
 ```python
