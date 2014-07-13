@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='phant',
-    version='0.1',
+    version='0.2',
     author='Matthias Vogelgesang',
     description='Client library for Sparkfun\'s Phant',
     author_email='matthias.vogelgesang@gmail.com',
