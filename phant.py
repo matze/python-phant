@@ -1,10 +1,15 @@
 import os
+import sys
 import datetime
 import requests as rq
 
 
-def only_strings_in(iterable):
-    return all((isinstance(x, (str, unicode)) for x in iterable))
+if sys.version_info[0] < 3:
+    def only_strings_in(iterable):
+        return all((isinstance(x, (str, unicode)) for x in iterable))
+else:
+    def only_strings_in(iterable):
+        return all((isinstance(x, str) for x in iterable))
 
 
 def check_json_response(response):
