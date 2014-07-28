@@ -1,4 +1,3 @@
-import os
 import sys
 import datetime
 import requests as rq
@@ -31,7 +30,7 @@ class Phant(object):
         self.public_key = public_key
         self.private_key = kwargs.pop('private_key', None)
         self.delete_key = kwargs.pop('delete_key', None)
-        self.base_url = kwargs.pop('base_url', None) or 'http://data.sparkfun.com/'
+        self.base_url = kwargs.pop('base_url', None) or 'http://data.sparkfun.com'
         self._fields = fields
         self._stats = None
         self._last_headers = None
@@ -111,7 +110,7 @@ class Phant(object):
             raise ValueError("Must create Phant object with private_key to {}".format(message))
 
     def _get_url(self, command, ext='.json'):
-        return os.path.join(self.base_url, command, self.public_key) + ext
+        return '{}/{}/{}{}'.format(self.base_url, command, self.public_key, ext)
 
     def _get_stat(self, name):
         if not self._stats:
