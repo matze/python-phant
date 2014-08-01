@@ -1,5 +1,4 @@
 from httmock import urlmatch, HTTMock, all_requests, response
-import json
 import phant
 import unittest
 
@@ -25,13 +24,13 @@ class Server(object):
         self.remaining_requests -= 1
         self.remaining_bytes -= 1
         self.used_bytes += 1
-        return json_response(json.dumps({'success': True}))
+        return json_response({'success': True})
 
     @urlmatch(scheme='http', netloc=BASE_URL, path='/output/' + PUBLIC + '/stats.json')
     def mock_stats(self, url, request):
         stats = dict(remaining=self.remaining_bytes,
                      used=self.used_bytes)
-        return json_response(json.dumps(stats))
+        return json_response(stats)
 
 
 class RequestTests(unittest.TestCase):
