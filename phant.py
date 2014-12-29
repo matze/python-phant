@@ -61,7 +61,26 @@ class Phant(object):
         headers = {'Phant-Private-Key': self.private_key}
         self._session.delete(self._get_url('input', ext=''), headers=headers)
 
-    def get(self, limit=None, offset=None, sample=None, convert_timestamp=True):
+    def _check_limit_tuple(self,limit_tuple):
+        if not isinstance(limit_tuple, tuple):
+            raise ValueError("Limit argument must be a tuple")
+
+        if len(limit_tuple) != 2:
+            raise ValueError("Limit tuple must be of len() == 2.  Got {}".format(len(limit_tuple)))
+
+        if not isinstance(limit_tuple[0], (str,basestring,unicode)):
+            raise ValueError("Field name must be a string")
+
+        if not isinstance(limit_tuple[1], (str, basestring, unicode)):
+            raise ValueError("Field limit must be a string")
+
+        if limit_tuple[0] not in self._fields:
+            raise ValueError("Field \'{}\' not in the known list of fields: {}".format(limit_tuple[0],self._fields))
+
+        return True
+
+
+    def get(self, limit=None, offset=None, sample=None, grep=None, eq=None, ne=None, gt=None, lt=None, gte=None, lte=None, convert_timestamp=True):
         """
         Return the data as a list of dictionaries.
 
@@ -74,6 +93,21 @@ class Phant(object):
         :type offset: int
         :param sample: Only return every N samples.  Implemented server side
         :type sample: int
+        :param grep: Expects a tuple of (field,limit) to limit on.  Includes if values in field match the regular express supplied in limit
+        :type grep: tuple
+        :param eq: Expects a tuple of (field,limit) to limit on.  Includes if values in field == the value supplied in limit
+        :type eq: tuple
+        :param ne: Expects a tuple of (field,limit) to limit on.  Includes if values in field is != to the value supplied in limit
+        :type ne: tuple
+        :param gt: Expects a tuple of (field,limit) to limit on.  Includes if values in field > the value supplied in limit
+        :type gt: tuple
+        :param lt: Expects a tuple of (field,limit) to limit on.  Includes if values in field < the value supplied in limit
+        :type lt: tuple
+        :param gte: Expects a tuple of (field,limit) to limit on.  Includes if values in field >= the value supplied in limit
+        :type gte: tuple
+        :param lte: Expects a tuple of (field,limit) to limit on.  Includes if values in field <= the value supplied in limit
+        :type lte: tuple
+
         """
 
         params = {}
@@ -93,7 +127,49 @@ class Phant(object):
             params['sample'] = limit
 
 
-        response = self._session.get(self._get_url('output'), params=params).json()
+        if grep and self._check_limit_tuple(eq):
+            logging.debug("Found grep limit")
+            params['{}[{}]'.format('grep', grep[0])] = grep[1]
+
+
+        if eq and self._check_limit_tuple(eq):
+            logging.debug("Found eq limit")
+            params['{}[{}]'.format('eq', eq[0])] = eq[1]
+
+        if ne and  self._check_limit_tuple(ne):
+            logging.debug("Found ne limit")
+            params['{}[{}]'.format('ne', ne[0])] = ne[1]
+
+        if gt and  self._check_limit_tuple(gt):
+            logging.debug("Found gt limit")
+            params['{}[{}]'.format('gt', gt[0])] = gt[1]
+
+        if lt and self._check_limit_tuple(lt):
+            logging.debug("Found lt limit")
+            params['{}[{}]'.format('lt', lt[0])] = lt[1]
+
+        if gte and self._check_limit_tuple(gte):
+            logging.debug("Found gte limit")
+            params['{}[{}]'.format('gte', gte[0])] = gte[1]
+
+        if lte and self._check_limit_tuple(lte):
+            logging.debug("Found lte limit")
+            params['{}[{}]'.format('lte', lte[0])] = lte[1]
+
+
+        """
+        TODO:
+
+        This is kind of a hack, because the current version of the Phant server doesn't properly handle url encoded
+        strings in the query params.  The requests library always urlencodes them, and with the goofy grep[fielname]=regex syntax that
+        Phant expects, it gets wonky.  This hack creates a string thats NOT encoded that requests is willing to just pass along blindly,
+        where normally you'd pass a dictionary.
+        """
+        payload_str = "&".join("%s=%s" % (k, v) for k, v in params.items())
+        response = self._session.get(self._get_url('output'), params=payload_str).json()
+
+
+
         check_json_response(response)
 
         if convert_timestamp:
