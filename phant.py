@@ -35,6 +35,9 @@ class Phant(object):
         self._stats = None
         self._last_headers = None
 
+        self._session = rq.Session()
+
+
     def log(self, *args):
         """
         Log arguments. args must match the fields and the object must be
@@ -43,7 +46,7 @@ class Phant(object):
         self._check_private_key("log data")
         params = {'private_key': self.private_key}
         params.update(dict((k, v) for k, v in zip(self._fields, args)))
-        response = rq.post(self._get_url('input'), params=params)
+        response = self._session.post(self._get_url('input'), params=params)
         check_json_response(response.json())
 
         self._last_headers = response.headers
@@ -55,7 +58,7 @@ class Phant(object):
         """
         self._check_private_key("clear data")
         headers = {'Phant-Private-Key': self.private_key}
-        rq.delete(self._get_url('input', ext=''), headers=headers)
+        self._session.delete(self._get_url('input', ext=''), headers=headers)
 
     def get(self, convert_timestamp=True):
         """
@@ -64,7 +67,7 @@ class Phant(object):
         If *convert_timestamp* is False, the timestamps will not be converted to
         datetime.datetime objects.
         """
-        response = rq.get(self._get_url('output')).json()
+        response = self._session.get(self._get_url('output')).json()
         check_json_response(response)
 
         if convert_timestamp:
@@ -114,7 +117,7 @@ class Phant(object):
 
     def _get_stat(self, name):
         if not self._stats:
-            response = rq.get(self._get_url('output', '/stats.json'))
+            response = self._session.get(self._get_url('output', '/stats.json'))
             self._stats = response.json()
 
         return self._stats[name]
