@@ -1,7 +1,7 @@
 import sys
 import datetime
 import requests as rq
-
+import logging
 
 if sys.version_info[0] < 3:
     def only_strings_in(iterable):
@@ -35,6 +35,7 @@ class Phant(object):
         self._stats = None
         self._last_headers = None
 
+
         self._session = rq.Session()
 
 
@@ -60,14 +61,39 @@ class Phant(object):
         headers = {'Phant-Private-Key': self.private_key}
         self._session.delete(self._get_url('input', ext=''), headers=headers)
 
-    def get(self, convert_timestamp=True):
+    def get(self, limit=None, offset=None, sample=None, convert_timestamp=True):
         """
         Return the data as a list of dictionaries.
 
         If *convert_timestamp* is False, the timestamps will not be converted to
         datetime.datetime objects.
+
+        :param limit: Limits how many entries will be returned.
+        :type limit: int
+        :param offset: Skip offset records before returning normally.  Implemented server side
+        :type offset: int
+        :param sample: Only return every N samples.  Implemented server side
+        :type sample: int
         """
-        response = self._session.get(self._get_url('output')).json()
+
+        params = {}
+        if limit:
+            if not isinstance(limit, int):
+                raise ValueError("Limit must be an int")
+            params['limit'] = limit
+
+        if offset:
+            if not isinstance(offset, int):
+                raise ValueError("Offset must be an int")
+            params['offset'] = limit
+
+        if sample:
+            if not isinstance(sample, int):
+                raise ValueError("Sample must be an int")
+            params['sample'] = limit
+
+
+        response = self._session.get(self._get_url('output'), params=params).json()
         check_json_response(response)
 
         if convert_timestamp:
@@ -81,22 +107,39 @@ class Phant(object):
     @property
     def remaining_requests(self):
         """Number of remaining requests."""
-        return self._get_limit('Remaining')
+        try:
+            return self._get_limit('Remaining')
+        except ValueError:
+            logging.error("Unable to gather limit statistics until log() has been called. Returning -1")
+            return -1
+
 
     @property
     def request_limit(self):
         """Request limit."""
-        return self._get_limit('Limit')
+        try:
+            return self._get_limit('Limit')
+        except ValueError:
+            logging.error("Unable to gather limit statistics until log() has been called. Returning -1")
+            return -1
 
     @property
     def reset_time(self):
         """Request reset time."""
-        return self._get_limit('Reset')
+        try:
+            return self._get_limit('Reset')
+        except ValueError:
+            logging.error("Unable to gather limit statistics until log() has been called. Returning -1")
+            return -1
 
     @property
     def remaining_bytes(self):
         """Number of remaining stream bytes."""
-        return self._get_stat('remaining')
+        try:
+            return self._get_limit('remaining')
+        except ValueError:
+            logging.error("Unable to gather limit statistics until log() has been called. Returning -1")
+            return -1
 
     @property
     def used_bytes(self):
@@ -113,6 +156,9 @@ class Phant(object):
             raise ValueError("Must create Phant object with private_key to {}".format(message))
 
     def _get_url(self, command, ext='.json'):
+
+
+
         return '{}/{}/{}{}'.format(self.base_url, command, self.public_key, ext)
 
     def _get_stat(self, name):
