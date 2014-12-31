@@ -34,10 +34,7 @@ class Phant(object):
         self._fields = fields
         self._stats = None
         self._last_headers = None
-
-
         self._session = rq.Session()
-
 
     def log(self, *args):
         """
@@ -61,24 +58,23 @@ class Phant(object):
         headers = {'Phant-Private-Key': self.private_key}
         self._session.delete(self._get_url('input', ext=''), headers=headers)
 
-    def _check_limit_tuple(self,limit_tuple):
+    def _check_limit_tuple(self, limit_tuple):
         if not isinstance(limit_tuple, tuple):
             raise ValueError("Limit argument must be a tuple")
 
         if len(limit_tuple) != 2:
             raise ValueError("Limit tuple must be of len() == 2.  Got {}".format(len(limit_tuple)))
 
-        if not isinstance(limit_tuple[0], (str,basestring,unicode)):
+        if not isinstance(limit_tuple[0], (str, basestring, unicode)):
             raise ValueError("Field name must be a string")
 
         if not isinstance(limit_tuple[1], (str, basestring, unicode)):
             raise ValueError("Field limit must be a string")
 
         if limit_tuple[0] not in self._fields:
-            raise ValueError("Field \'{}\' not in the known list of fields: {}".format(limit_tuple[0],self._fields))
+            raise ValueError("Field \'{}\' not in the known list of fields: {}".format(limit_tuple[0], self._fields))
 
         return True
-
 
     def get(self, limit=None, offset=None, sample=None, grep=None, eq=None, ne=None, gt=None, lt=None, gte=None, lte=None, convert_timestamp=True):
         """
@@ -126,21 +122,19 @@ class Phant(object):
                 raise ValueError("Sample must be an int")
             params['sample'] = limit
 
-
         if grep and self._check_limit_tuple(eq):
             logging.debug("Found grep limit")
             params['{}[{}]'.format('grep', grep[0])] = grep[1]
-
 
         if eq and self._check_limit_tuple(eq):
             logging.debug("Found eq limit")
             params['{}[{}]'.format('eq', eq[0])] = eq[1]
 
-        if ne and  self._check_limit_tuple(ne):
+        if ne and self._check_limit_tuple(ne):
             logging.debug("Found ne limit")
             params['{}[{}]'.format('ne', ne[0])] = ne[1]
 
-        if gt and  self._check_limit_tuple(gt):
+        if gt and self._check_limit_tuple(gt):
             logging.debug("Found gt limit")
             params['{}[{}]'.format('gt', gt[0])] = gt[1]
 
@@ -156,7 +150,6 @@ class Phant(object):
             logging.debug("Found lte limit")
             params['{}[{}]'.format('lte', lte[0])] = lte[1]
 
-
         """
         TODO:
 
@@ -167,17 +160,12 @@ class Phant(object):
         """
         payload_str = "&".join("%s=%s" % (k, v) for k, v in params.items())
         response = self._session.get(self._get_url('output'), params=payload_str).json()
-
-
-
         check_json_response(response)
-
         if convert_timestamp:
             pattern = '%Y-%m-%dT%H:%M:%S.%fZ'
             for entry in response:
                 timestamp = entry['timestamp']
                 entry['timestamp'] = datetime.datetime.strptime(timestamp, pattern)
-
         return response
 
     @property
@@ -188,7 +176,6 @@ class Phant(object):
         except ValueError:
             logging.error("Unable to gather limit statistics until log() has been called. Returning -1")
             return -1
-
 
     @property
     def request_limit(self):
@@ -232,9 +219,6 @@ class Phant(object):
             raise ValueError("Must create Phant object with private_key to {}".format(message))
 
     def _get_url(self, command, ext='.json'):
-
-
-
         return '{}/{}/{}{}'.format(self.base_url, command, self.public_key, ext)
 
     def _get_stat(self, name):
