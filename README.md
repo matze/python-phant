@@ -15,6 +15,8 @@ Either
 
 ### Usage
 
+A basic example of connecting and logging data.  Note that collecting some of the information around API rate limits only works after a `log()` command
+
 ```python
 p = Phant('xyzpublickey', 'temp', 'humid', private_key='abcprivatekey')
 
@@ -23,4 +25,15 @@ print(p.remaining_bytes, p.cap)
 
 data = p.get()
 print(data['temp'])
+```
+
+Another example, this time limiting to 10 results, and only if the temperature was '9'.
+
+```python
+
+p.get(
+    eq=("temp","9"),
+    limit=10
+)
+
 ```
