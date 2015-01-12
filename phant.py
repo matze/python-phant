@@ -115,12 +115,12 @@ class Phant(object):
         if offset:
             if not isinstance(offset, int):
                 raise ValueError("Offset must be an int")
-            params['offset'] = limit
+            params['offset'] = offset
 
         if sample:
             if not isinstance(sample, int):
                 raise ValueError("Sample must be an int")
-            params['sample'] = limit
+            params['sample'] = sample
 
         if grep and self._check_limit_tuple(eq):
             logging.debug("Found grep limit")
