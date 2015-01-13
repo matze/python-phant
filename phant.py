@@ -76,7 +76,7 @@ class Phant(object):
 
         return True
 
-    def get(self, limit=None, offset=None, sample=None, grep=None, eq=None, ne=None, gt=None, lt=None, gte=None, lte=None, convert_timestamp=True):
+    def get(self, limit=None, offset=None, sample=None, timezone=None, grep=None, eq=None, ne=None, gt=None, lt=None, gte=None, lte=None, convert_timestamp=True):
         """
         Return the data as a list of dictionaries.
 
@@ -89,6 +89,10 @@ class Phant(object):
         :type offset: int
         :param sample: Only return every N samples.  Implemented server side
         :type sample: int
+        :param timezone: Convert timestamp to specified timezone. See https://www.iana.org/time-zones for definition or
+                         https://en.wikipedia.org/wiki/List_of_tz_database_time_zones for a convenient list of string.
+                         Implemented server side
+        :type timezone: str
         :param grep: Expects a tuple of (field,limit) to limit on.  Includes if values in field match the regular express supplied in limit
         :type grep: tuple
         :param eq: Expects a tuple of (field,limit) to limit on.  Includes if values in field == the value supplied in limit
@@ -121,6 +125,11 @@ class Phant(object):
             if not isinstance(sample, int):
                 raise ValueError("Sample must be an int")
             params['sample'] = sample
+
+        if timezone:
+            if not isinstance(timezone, str):
+                raise ValueError("Timezone must be a str")
+            params['timezone'] = timezone
 
         if grep and self._check_limit_tuple(eq):
             logging.debug("Found grep limit")
@@ -162,9 +171,15 @@ class Phant(object):
         response = self._session.get(self._get_url('output'), params=payload_str).json()
         check_json_response(response)
         if convert_timestamp:
-            pattern = '%Y-%m-%dT%H:%M:%S.%fZ'
+            if timezone:
+                pattern = '%Y-%m-%dT%H:%M:%S'
+            else:
+                pattern = '%Y-%m-%dT%H:%M:%S.%fZ'
+
             for entry in response:
                 timestamp = entry['timestamp']
+                if timezone:
+                    timestamp = timestamp[:-6]
                 entry['timestamp'] = datetime.datetime.strptime(timestamp, pattern)
         return response
 
