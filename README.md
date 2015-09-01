@@ -18,9 +18,13 @@ Either
 A basic example of connecting and logging data.  Note that collecting some of the information around API rate limits only works after a `log()` command
 
 ```python
+import sys
+from phant import Phant
 p = Phant('xyzpublickey', 'temp', 'humid', private_key='abcprivatekey')
 
-p.log(33.4, 10.2)
+t = 33.4
+h = 10.2
+p.log(t, h)
 print(p.remaining_bytes, p.cap)
 
 data = p.get()
