@@ -33,12 +33,24 @@ class Phant(object):
         self.base_url = base_url
         # If no fieds explicitly given, try to guess.
         self._session = rq.Session()
-        self._fields = fields
+        if len(fields) == 0:
+            self._fields = self.get_fields()
+        else:
+            self._fields = fields
         self._extended_fields = ['timestamp']
         self._extended_fields.extend(self._fields)
         self._stats = None
         self._last_headers = None
 
+    def get_fields(self):
+        '''
+        Gets required parameters from a first dummy request.
+        The way we get the parameters is a little bit tricky 
+        but works.
+        '''
+        self._check_private_key("log data")
+        response = self._session.post(self._get_url('input'), params={'private_key': self.private_key})
+        return map(lambda x: x.strip(), response.json()['message'].split('missing from sent data. \n\nexpecting:')[1].split(','))
 
     def log(self, *args):
         """
