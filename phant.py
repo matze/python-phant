@@ -18,25 +18,27 @@ def check_json_response(response):
 
 class Phant(object):
 
-    def __init__(self, public_key, *fields, **kwargs):
+    def __init__(self, public_key, fields=[], private_key=None, delete_key=None, base_url='http://data.sparkfun.com'):
         """
-        *fields is a tuple containg the field names of the stream identified by
-        *public_key*. **kwargs can additionally contain the *private_key*, the
+        *fields* is a tuple containg the field names of the stream identified by *public_key*. 
+        Can additionally contain the *private_key*, the
         *delete_key* and an alternative *base_url*.
         """
         if not only_strings_in(fields):
             raise ValueError("String type expected for *fields")
 
         self.public_key = public_key
-        self.private_key = kwargs.pop('private_key', None)
-        self.delete_key = kwargs.pop('delete_key', None)
-        self.base_url = kwargs.pop('base_url', None) or 'http://data.sparkfun.com'
+        self.private_key = private_key
+        self.delete_key = delete_key
+        self.base_url = base_url
+        # If no fieds explicitly given, try to guess.
+        self._session = rq.Session()
         self._fields = fields
         self._extended_fields = ['timestamp']
         self._extended_fields.extend(self._fields)
         self._stats = None
         self._last_headers = None
-        self._session = rq.Session()
+
 
     def log(self, *args):
         """
