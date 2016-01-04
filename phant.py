@@ -92,7 +92,7 @@ class Phant(object):
 
         return True
 
-    def get(self, limit=None, offset=None, sample=None, timezone=None, grep=None, eq=None, ne=None, gt=None, lt=None, gte=None, lte=None, convert_timestamp=True):
+    def get(self, limit=None, offset=None, sample=None, timezone=None, grep=None, eq=None, ne=None, gt=None, lt=None, gte=None, lte=None, convert_timestamp=True, sort_by=None):
         """
         Return the data as a list of dictionaries.
 
@@ -124,6 +124,8 @@ class Phant(object):
         :param lte: Expects a tuple of (field,limit) to limit on.  Includes if values in field <= the value supplied in limit
         :type lte: tuple
 
+        :param sort_by: Expects a key to sort entries (defaults to None for unsorted output)
+        :type sort_by: str
         """
 
         params = {}
@@ -197,6 +199,10 @@ class Phant(object):
                 if timezone:
                     timestamp = timestamp[:-6]
                 entry['timestamp'] = datetime.datetime.strptime(timestamp, pattern)
+        if sort_by:
+            if sort_by not in self._extended_fields:
+                raise ValueError("Field \'{}\' not in the known list of fields: {}".format(sort_by, self._fields))
+            response = sorted(response, key=lambda x: x[sort_by])
         return response
 
     @property
