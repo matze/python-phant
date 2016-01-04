@@ -32,6 +32,8 @@ class Phant(object):
         self.delete_key = kwargs.pop('delete_key', None)
         self.base_url = kwargs.pop('base_url', None) or 'http://data.sparkfun.com'
         self._fields = fields
+        self._extended_fields = ['timestamp']
+        self._extended_fields.extend(self._fields)
         self._stats = None
         self._last_headers = None
         self._session = rq.Session()
@@ -71,7 +73,7 @@ class Phant(object):
         if not isinstance(limit_tuple[1], (str, basestring, unicode)):
             raise ValueError("Field limit must be a string")
 
-        if limit_tuple[0] not in self._fields:
+        if limit_tuple[0] not in self._extended_fields:
             raise ValueError("Field \'{}\' not in the known list of fields: {}".format(limit_tuple[0], self._fields))
 
         return True
