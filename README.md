@@ -20,7 +20,7 @@ A basic example of connecting and logging data.  Note that collecting some of th
 ```python
 import sys
 from phant import Phant
-p = Phant('xyzpublickey', 'temp', 'humid', private_key='abcprivatekey')
+p = Phant('xyzpublickey', fields=['temp', 'humid'], private_key='abcprivatekey')
 
 t = 33.4
 h = 10.2
