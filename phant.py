@@ -2,6 +2,7 @@ import sys
 import datetime
 import requests as rq
 import logging
+import json
 
 if sys.version_info[0] < 3:
     def only_strings_in(iterable):
@@ -11,13 +12,37 @@ else:
         return all((isinstance(x, str) for x in iterable))
 
 
+def default_encode(o):
+    '''
+    Encode complex numbers to json serializable objects
+    '''
+    if type(o) == complex:
+        return {'__complex__': True, 'real': o.real, 'imag': o.imag}
+    return o
+
+
+def default_decode(o):
+    '''
+    Decode complex numbers from json serializable objects
+    '''
+    if isinstance(o, dict):
+        if '__complex__' in o:
+            return complex(o['real'], o['imag'])
+    return o
+
+
 def check_json_response(response):
+    '''
+    Translate errorful responses to python exceptions
+    '''
     if isinstance(response, dict) and not response['success']:
         raise ValueError(response['message'])
 
 
 class Phant(object):
-
+    '''
+    Main class to manage Phant connections
+    '''
     def __init__(self, public_key, fields=[], private_key=None, delete_key=None, base_url='http://data.sparkfun.com'):
         """
         *fields* is a tuple containg the field names of the stream identified by *public_key*. 
@@ -26,13 +51,12 @@ class Phant(object):
         """
         if not only_strings_in(fields):
             raise ValueError("String type expected for *fields")
-
         self.public_key = public_key
         self.private_key = private_key
         self.delete_key = delete_key
         self.base_url = base_url
-        # If no fieds explicitly given, try to guess.
         self._session = rq.Session()
+        # If no fieds explicitly given, try to guess.
         if len(fields) == 0:
             self._fields = self.get_fields()
         else:
@@ -42,6 +66,24 @@ class Phant(object):
         self._stats = None
         self._last_headers = None
 
+    def serialize(self, value):
+        '''
+        Convert sent values to json serializable objects
+        '''
+        return json.dumps(value, default=default_encode)
+
+    def deserialize(self, key, value):
+        '''
+        Translate back json serializable objects.
+        '''
+        if key != 'timestamp':
+            try:
+                return json.loads(value, object_hook=default_decode)
+            except TypeError:
+                logging.debug('Unable to deserialize %s of type %s' %
+                              (value, type(value)))
+        return value
+
     def get_fields(self):
         '''
         Gets required parameters from a first dummy request.
@@ -49,7 +91,8 @@ class Phant(object):
         but works.
         '''
         self._check_private_key("log data")
-        response = self._session.post(self._get_url('input'), params={'private_key': self.private_key})
+        response = self._session.post(self._get_url('input'), params={
+                                      'private_key': self.private_key})
         return map(lambda x: x.strip(), response.json()['message'].split('missing from sent data. \n\nexpecting:')[1].split(','))
 
     def log(self, *args):
@@ -59,7 +102,8 @@ class Phant(object):
         """
         self._check_private_key("log data")
         params = {'private_key': self.private_key}
-        params.update(dict((k, v) for k, v in zip(self._fields, args)))
+        params.update(dict((k, self.serialize(v))
+                           for k, v in zip(self._fields, args)))
         response = self._session.post(self._get_url('input'), params=params)
         check_json_response(response.json())
 
@@ -79,7 +123,8 @@ class Phant(object):
             raise ValueError("Limit argument must be a tuple")
 
         if len(limit_tuple) != 2:
-            raise ValueError("Limit tuple must be of len() == 2.  Got {}".format(len(limit_tuple)))
+            raise ValueError(
+                "Limit tuple must be of len() == 2.  Got {}".format(len(limit_tuple)))
 
         if not isinstance(limit_tuple[0], (str, basestring, unicode)):
             raise ValueError("Field name must be a string")
@@ -88,7 +133,8 @@ class Phant(object):
             raise ValueError("Field limit must be a string")
 
         if limit_tuple[0] not in self._extended_fields:
-            raise ValueError("Field \'{}\' not in the known list of fields: {}".format(limit_tuple[0], self._fields))
+            raise ValueError("Field \'{}\' not in the known list of fields: {}".format(
+                limit_tuple[0], self._fields))
 
         return True
 
@@ -123,7 +169,6 @@ class Phant(object):
         :type gte: tuple
         :param lte: Expects a tuple of (field,limit) to limit on.  Includes if values in field <= the value supplied in limit
         :type lte: tuple
-
         :param sort_by: Expects a key to sort entries (defaults to None for unsorted output)
         :type sort_by: str
         """
@@ -186,7 +231,8 @@ class Phant(object):
         where normally you'd pass a dictionary.
         """
         payload_str = "&".join("%s=%s" % (k, v) for k, v in params.items())
-        response = self._session.get(self._get_url('output'), params=payload_str).json()
+        response = self._session.get(self._get_url(
+            'output'), params=payload_str).json()
         check_json_response(response)
         if convert_timestamp:
             if timezone:
@@ -198,10 +244,14 @@ class Phant(object):
                 timestamp = entry['timestamp']
                 if timezone:
                     timestamp = timestamp[:-6]
-                entry['timestamp'] = datetime.datetime.strptime(timestamp, pattern)
+                entry['timestamp'] = datetime.datetime.strptime(
+                    timestamp, pattern)
+        response = map(lambda r: {k: self.deserialize(k, v)
+                                  for k, v in r.items()}, response)
         if sort_by:
             if sort_by not in self._extended_fields:
-                raise ValueError("Field \'{}\' not in the known list of fields: {}".format(sort_by, self._fields))
+                raise ValueError("Field \'{}\' not in the known list of fields: {}".format(
+                    sort_by, self._fields))
             response = sorted(response, key=lambda x: x[sort_by])
         return response
 
@@ -211,7 +261,8 @@ class Phant(object):
         try:
             return self._get_limit('Remaining')
         except ValueError:
-            logging.error("Unable to gather limit statistics until log() has been called. Returning -1")
+            logging.error(
+                "Unable to gather limit statistics until log() has been called. Returning -1")
             return -1
 
     @property
@@ -220,7 +271,8 @@ class Phant(object):
         try:
             return self._get_limit('Limit')
         except ValueError:
-            logging.error("Unable to gather limit statistics until log() has been called. Returning -1")
+            logging.error(
+                "Unable to gather limit statistics until log() has been called. Returning -1")
             return -1
 
     @property
@@ -229,7 +281,8 @@ class Phant(object):
         try:
             return self._get_limit('Reset')
         except ValueError:
-            logging.error("Unable to gather limit statistics until log() has been called. Returning -1")
+            logging.error(
+                "Unable to gather limit statistics until log() has been called. Returning -1")
             return -1
 
     @property
@@ -238,7 +291,8 @@ class Phant(object):
         try:
             return self._get_limit('remaining')
         except ValueError:
-            logging.error("Unable to gather limit statistics until log() has been called. Returning -1")
+            logging.error(
+                "Unable to gather limit statistics until log() has been called. Returning -1")
             return -1
 
     @property
@@ -253,14 +307,16 @@ class Phant(object):
 
     def _check_private_key(self, message):
         if not self.private_key:
-            raise ValueError("Must create Phant object with private_key to {}".format(message))
+            raise ValueError(
+                "Must create Phant object with private_key to {}".format(message))
 
     def _get_url(self, command, ext='.json'):
         return '{}/{}/{}{}'.format(self.base_url, command, self.public_key, ext)
 
     def _get_stat(self, name):
         if not self._stats:
-            response = self._session.get(self._get_url('output', '/stats.json'))
+            response = self._session.get(
+                self._get_url('output', '/stats.json'))
             self._stats = response.json()
 
         return self._stats[name]
