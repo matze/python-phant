@@ -3,6 +3,15 @@ import datetime
 import requests as rq
 import logging
 import json
+try:
+    from Crypto.Cipher import AES
+    from Crypto import Random
+    import hashlib
+    import base64
+    CRYPTO_AVAILABLE=True
+except Exception, CRYPTO_EXCEPTION:
+    CRYPTO_AVAILABLE=False
+
 
 if sys.version_info[0] < 3:
     def only_strings_in(iterable):
@@ -43,7 +52,7 @@ class Phant(object):
     '''
     Main class to manage Phant connections
     '''
-    def __init__(self, public_key, fields=[], private_key=None, delete_key=None, base_url='http://data.sparkfun.com'):
+    def __init__(self, public_key, own_key=None, fields=[], private_key=None, delete_key=None, base_url='http://data.sparkfun.com'):
         """
         *fields* is a tuple containg the field names of the stream identified by *public_key*. 
         Can additionally contain the *private_key*, the
@@ -53,6 +62,14 @@ class Phant(object):
             raise ValueError("String type expected for *fields")
         self.public_key = public_key
         self.private_key = private_key
+        self.own_key = own_key
+        if own_key:
+            if not CRYPTO_AVAILABLE:
+                raise CRYPTO_EXCEPTION
+            self.own_key = hashlib.sha256(own_key).digest()
+            BS = 16
+            self.pad = lambda s: s + (BS - len(s) % BS) * chr(BS - len(s) % BS) 
+            self.unpad = lambda s : s[:-ord(s[len(s)-1:])]
         self.delete_key = delete_key
         self.base_url = base_url
         self._session = rq.Session()
@@ -70,15 +87,26 @@ class Phant(object):
         '''
         Convert sent values to json serializable objects
         '''
-        return json.dumps(value, default=default_encode)
+        message = json.dumps(value, default=default_encode, ensure_ascii=True, encoding="ascii")
+        if self.own_key is not None:
+            message=self.pad(message)
+            IV = Random.new().read( AES.block_size )
+            encryption_suite = AES.new(self.own_key, AES.MODE_CBC, IV)
+            message = base64.b64encode( IV + encryption_suite.encrypt(message) )
+        return message
 
     def deserialize(self, key, value):
         '''
         Translate back json serializable objects.
         '''
         if key != 'timestamp':
+            if self.own_key is not None:
+                enc = base64.b64decode(value)
+                IV = enc[:16]
+                encryption_suite = AES.new(self.own_key, AES.MODE_CBC, IV)
+                value = self.unpad( encryption_suite.decrypt( enc[16:] ) )
             try:
-                return json.loads(value, object_hook=default_decode)
+                value = json.loads(value, object_hook=default_decode)
             except TypeError:
                 logging.debug('Unable to deserialize %s of type %s' %
                               (value, type(value)))
