@@ -74,13 +74,13 @@ p.get(limit=1)
   u'x': 2,
   u'y': 3,
   u'z': (4+6j)}]
-´´´
+```
 
 As you can see, complex numbers are correctly logged and got.
 
 If now we try to get  the same values using the default encoder (`plain_json`):
  
-´´´python
+```python
 
 p=phant.Phant(jsonPath='python-phant/keys.json')
 
