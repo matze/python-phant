@@ -1,7 +1,9 @@
 import sys
 import datetime
-import requests as rq
+import requests
 import logging
+import encoders
+import json
 
 if sys.version_info[0] < 3:
     def only_strings_in(iterable):
@@ -11,30 +13,130 @@ else:
         return all((isinstance(x, str) for x in iterable))
 
 
-def check_json_response(response):
-    if isinstance(response, dict) and not response['success']:
-        raise ValueError(response['message'])
-
-
 class Phant(object):
+    '''
+    Main class to manage Phant connections
+    '''
 
-    def __init__(self, public_key, *fields, **kwargs):
+    def __init__(self,
+                 publicKey=None,
+                 jsonPath=None,
+                 title=None,
+                 fields=[],
+                 privateKey=None,
+                 deleteKey=None,
+                 baseUrl='http://data.sparkfun.com',
+                 encoder=encoders.plain_json):
         """
-        *fields is a tuple containg the field names of the stream identified by
-        *public_key*. **kwargs can additionally contain the *private_key*, the
-        *delete_key* and an alternative *base_url*.
+        *fields* is a tuple containg the field names of the stream
+        If a jsonPath is given, stream configuration data will be 
+        read from json. 
         """
+        self._encoder = encoder
+        if jsonPath:
+            self._jsonKeys = json.load(open(jsonPath))
+        else:
+            self._baseUrl = baseUrl
+            self._jsonKeys = {
+                'title': title,
+                'publicKey': publicKey,
+                'deleteKey': deleteKey,
+                'privateKey': privateKey,
+                'inputUrl': self._get_url('input', extension=''),
+                'outputUrl': self._get_url('output'),
+                'manageUrl': self._get_url('streams')
+            }
+        self.publicKey = self._jsonKeys.get(
+            'publicKey',
+            None)
+        self.title = self._jsonKeys.get(
+            'title',
+            None)
+        self.privateKey = self._jsonKeys.get(
+            'privateKey',
+            None)
+        self.deleteKey = self._jsonKeys.get(
+            'deleteKey',
+            None)
+
+        self._session = requests.Session()
         if not only_strings_in(fields):
             raise ValueError("String type expected for *fields")
 
-        self.public_key = public_key
-        self.private_key = kwargs.pop('private_key', None)
-        self.delete_key = kwargs.pop('delete_key', None)
-        self.base_url = kwargs.pop('base_url', None) or 'http://data.sparkfun.com'
         self._fields = fields
         self._stats = None
         self._last_headers = None
-        self._session = rq.Session()
+
+    def __str__(self):
+        return json.dumps(self._jsonKeys,
+                          indent=4)
+
+    def inputUrl(self, extension='.json'):
+        return self._jsonKeys['inputUrl'] + extension
+
+    def outputUrl(self, extension='.json'):
+        return self._jsonKeys['outputUrl'] + extension
+
+    def manageUrl(self, extension='.json'):
+        return self._jsonKeys['manageUrl'] + extension
+
+    def _get_url_from_base(self, command):
+        return '{}/{}/{}'.format(self._baseUrl, command, self.publicKey)
+
+    @property
+    def fields(self):
+        if len(self._fields) == 0:
+            self._fields = self._get_fields()
+        return self._fields
+
+    @property
+    def extended_fields(self):
+        return self._fields + ['timestamp']
+
+    def _get_fields(self):
+        '''
+        Gets required parameters from a first dummy request.
+        The way we get the parameters is a little bit tricky 
+        but works.
+        '''
+        self._check_private_key("log data")
+        response = self._post(
+            self.inputUrl(),
+            params={
+                'private_key': self.privateKey
+            },
+            check=False
+        )
+        return map(lambda x: x.strip(), response.json()['message'].split('expecting:')[1].split(','))
+
+    def _check_response(self, response):
+        '''
+        Translate errorful responses to python exceptions
+        '''
+        if isinstance(response, dict):
+            if not response['success']:
+                raise ValueError(response['message'])
+        elif isinstance(response, requests.models.Response):
+            if not response.ok:
+                raise ValueError(response.text)
+
+    def _post(self, url, params={}, check=True):
+        response = self._session.post(url, params=params)
+        if check:
+            self._check_response(response)
+        return response
+
+    def _get(self, url, params={}, check=True):
+        response = self._session.get(url, params=params)
+        if check:
+            self._check_response(response)
+        return response
+
+    def _delete(self, url, params={}, check=True):
+        response = self._session.delete(url, params=params)
+        if check:
+            self._check_response(response)
+        return response
 
     def log(self, *args):
         """
@@ -42,10 +144,10 @@ class Phant(object):
         created with a *private_key*.
         """
         self._check_private_key("log data")
-        params = {'private_key': self.private_key}
-        params.update(dict((k, v) for k, v in zip(self._fields, args)))
-        response = self._session.post(self._get_url('input'), params=params)
-        check_json_response(response.json())
+        params = {'private_key': self.privateKey}
+        params.update(dict((k, self._encoder.serialize(v))
+                           for k, v in zip(self.fields, args)))
+        response = self._post(self.inputUrl(), params=params)
 
         self._last_headers = response.headers
         self._stats = None
@@ -55,15 +157,16 @@ class Phant(object):
         Clear data from stream. Object must be created with a *private_key*.
         """
         self._check_private_key("clear data")
-        headers = {'Phant-Private-Key': self.private_key}
-        self._session.delete(self._get_url('input', ext=''), headers=headers)
+        headers = {'Phant-Private-Key': self.privateKey}
+        self._delete(self.inputUrl(''), headers=headers)
 
     def _check_limit_tuple(self, limit_tuple):
         if not isinstance(limit_tuple, tuple):
             raise ValueError("Limit argument must be a tuple")
 
         if len(limit_tuple) != 2:
-            raise ValueError("Limit tuple must be of len() == 2.  Got {}".format(len(limit_tuple)))
+            raise ValueError(
+                "Limit tuple must be of len() == 2.  Got {}".format(len(limit_tuple)))
 
         if not isinstance(limit_tuple[0], (str, basestring, unicode)):
             raise ValueError("Field name must be a string")
@@ -71,12 +174,13 @@ class Phant(object):
         if not isinstance(limit_tuple[1], (str, basestring, unicode)):
             raise ValueError("Field limit must be a string")
 
-        if limit_tuple[0] not in self._fields:
-            raise ValueError("Field \'{}\' not in the known list of fields: {}".format(limit_tuple[0], self._fields))
+        if limit_tuple[0] not in self.extended_fields:
+            raise ValueError("Field \'{}\' not in the known list of fields: {}".format(
+                limit_tuple[0], self.fields))
 
         return True
 
-    def get(self, limit=None, offset=None, sample=None, timezone=None, grep=None, eq=None, ne=None, gt=None, lt=None, gte=None, lte=None, convert_timestamp=True):
+    def get(self, limit=None, offset=None, sample=None, timezone=None, grep=None, eq=None, ne=None, gt=None, lt=None, gte=None, lte=None, convert_timestamp=True, sort_by=None):
         """
         Return the data as a list of dictionaries.
 
@@ -107,7 +211,8 @@ class Phant(object):
         :type gte: tuple
         :param lte: Expects a tuple of (field,limit) to limit on.  Includes if values in field <= the value supplied in limit
         :type lte: tuple
-
+        :param sort_by: Expects a key to sort entries (defaults to None for unsorted output)
+        :type sort_by: str
         """
 
         params = {}
@@ -168,19 +273,27 @@ class Phant(object):
         where normally you'd pass a dictionary.
         """
         payload_str = "&".join("%s=%s" % (k, v) for k, v in params.items())
-        response = self._session.get(self._get_url('output'), params=payload_str).json()
-        check_json_response(response)
+        response = self._get(self.outputUrl(),
+                             params=payload_str
+                             ).json()
         if convert_timestamp:
             if timezone:
                 pattern = '%Y-%m-%dT%H:%M:%S'
             else:
                 pattern = '%Y-%m-%dT%H:%M:%S.%fZ'
-
             for entry in response:
                 timestamp = entry['timestamp']
                 if timezone:
                     timestamp = timestamp[:-6]
-                entry['timestamp'] = datetime.datetime.strptime(timestamp, pattern)
+                entry['timestamp'] = datetime.datetime.strptime(
+                    timestamp, pattern)
+        response = map(lambda r: {k: self._encoder.deserialize(k, v)
+                                  for k, v in r.items()}, response)
+        if sort_by:
+            if sort_by not in self.extended_fields:
+                raise ValueError("Field \'{}\' not in the known list of fields: {}".format(
+                    sort_by, self.fields))
+            response = sorted(response, key=lambda x: x[sort_by])
         return response
 
     @property
@@ -189,7 +302,8 @@ class Phant(object):
         try:
             return self._get_limit('Remaining')
         except ValueError:
-            logging.error("Unable to gather limit statistics until log() has been called. Returning -1")
+            logging.error(
+                "Unable to gather limit statistics until log() has been called. Returning -1")
             return -1
 
     @property
@@ -198,7 +312,8 @@ class Phant(object):
         try:
             return self._get_limit('Limit')
         except ValueError:
-            logging.error("Unable to gather limit statistics until log() has been called. Returning -1")
+            logging.error(
+                "Unable to gather limit statistics until log() has been called. Returning -1")
             return -1
 
     @property
@@ -207,7 +322,8 @@ class Phant(object):
         try:
             return self._get_limit('Reset')
         except ValueError:
-            logging.error("Unable to gather limit statistics until log() has been called. Returning -1")
+            logging.error(
+                "Unable to gather limit statistics until log() has been called. Returning -1")
             return -1
 
     @property
@@ -216,32 +332,38 @@ class Phant(object):
         try:
             return self._get_limit('remaining')
         except ValueError:
-            logging.error("Unable to gather limit statistics until log() has been called. Returning -1")
+            logging.error(
+                "Unable to gather limit statistics until log() has been called. Returning -1")
             return -1
 
     @property
     def used_bytes(self):
         """Used stream bytes."""
-        return self._get_stat('used')
+        return self._get_stats('used')
 
     @property
     def cap(self):
         """Stream limit."""
-        return self._get_stat('cap')
+        return self._get_stats('cap')
+
+    @property
+    def stats(self):
+        """Stream limit."""
+        return self._get_stats()
 
     def _check_private_key(self, message):
-        if not self.private_key:
-            raise ValueError("Must create Phant object with private_key to {}".format(message))
+        if not self.privateKey:
+            raise ValueError(
+                "Must create Phant object with private_key to {}".format(message))
 
-    def _get_url(self, command, ext='.json'):
-        return '{}/{}/{}{}'.format(self.base_url, command, self.public_key, ext)
-
-    def _get_stat(self, name):
-        if not self._stats:
-            response = self._session.get(self._get_url('output', '/stats.json'))
+    def _get_stats(self, name=None, force=False):
+        if not self._stats or force:
+            response = self._get(
+                self.outputUrl('/stats.json'))
             self._stats = response.json()
-
-        return self._stats[name]
+        if name:
+            return self._stats[name]
+        return self._stats
 
     def _get_limit(self, name):
         if not self._last_headers:
