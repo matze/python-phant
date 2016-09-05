@@ -29,9 +29,13 @@ class Phant(object):
                  encoder=encoders.plain_json):
         """
         *fields* is a tuple containg the field names of the stream
-        If a jsonPath is given, stream configuration data will be 
-        read from json. 
+        If a jsonPath is given, stream configuration data will be
+        read from json.
         """
+        self.publicKey = publicKey
+        self.privateKey = privateKey
+        self.deleteKey = deleteKey
+        self.title = title
         self._encoder = encoder
         if jsonPath:
             self._jsonKeys = json.load(open(jsonPath))
@@ -42,22 +46,11 @@ class Phant(object):
                 'publicKey': publicKey,
                 'deleteKey': deleteKey,
                 'privateKey': privateKey,
-                'inputUrl': self._get_url('input', extension=''),
-                'outputUrl': self._get_url('output'),
-                'manageUrl': self._get_url('streams')
+                'inputUrl': self._get_url_from_base('input'),
+                'outputUrl': self._get_url_from_base('output'),
+                'manageUrl': self._get_url_from_base('streams')
             }
-        self.publicKey = self._jsonKeys.get(
-            'publicKey',
-            None)
-        self.title = self._jsonKeys.get(
-            'title',
-            None)
-        self.privateKey = self._jsonKeys.get(
-            'privateKey',
-            None)
-        self.deleteKey = self._jsonKeys.get(
-            'deleteKey',
-            None)
+
 
         self._session = requests.Session()
         if not only_strings_in(fields):
@@ -96,7 +89,7 @@ class Phant(object):
     def _get_fields(self):
         '''
         Gets required parameters from a first dummy request.
-        The way we get the parameters is a little bit tricky 
+        The way we get the parameters is a little bit tricky
         but works.
         '''
         self._check_private_key("log data")
