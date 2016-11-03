@@ -38,7 +38,12 @@ class Phant(object):
         self.title = title
         self._encoder = encoder
         if jsonPath:
+            self._baseUrl = baseUrl
             self._jsonKeys = json.load(open(jsonPath))
+            self.publicKey = self._jsonKeys['publicKey']
+            self.privateKey = self._jsonKeys['privateKey']
+            self.deleteKey = self._jsonKeys['deleteKey']
+            self.title = self._jsonKeys['title']
         else:
             self._baseUrl = baseUrl
             self._jsonKeys = {
