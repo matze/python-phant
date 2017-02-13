@@ -1,8 +1,9 @@
+from . import encoders
+
 import sys
 import datetime
 import requests
 import logging
-import encoders
 import json
 
 if sys.version_info[0] < 3:

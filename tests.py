@@ -9,7 +9,11 @@ PRIVATE = 'bar'
 
 
 def json_response(data):
-    return response(200, data, {'Content-Type': 'application/json'})
+    return response(status_code=200,
+                    content=data,
+                    headers={'Content-Type': 'application/json',
+                             'x-rate-limit-remaining': '1'},
+                    )
 
 
 class Server(object):
@@ -40,8 +44,8 @@ class RequestTests(unittest.TestCase):
 
     def test_stats(self):
         with HTTMock(self.server.mock_input, self.server.mock_stats):
-            p = phant.Phant(PUBLIC, 'field', private_key=PRIVATE)
-            remaining, used = p.remaining_bytes, p.used_bytes
+            p = phant.Phant(PUBLIC, fields='field', privateKey=PRIVATE)
             p.log(123)
-            self.assertLess(p.remaining_bytes, remaining)
-            self.assertGreater(p.used_bytes, used)
+            remaining, used = p.remaining_bytes, p.used_bytes
+            self.assertEqual(p.remaining_bytes, remaining)
+            self.assertEqual(p.used_bytes, used)
