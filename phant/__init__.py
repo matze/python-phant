@@ -66,9 +66,14 @@ class Phant(object):
         self._stats = None
         self._last_headers = None
 
+    def __repr__(self):
+        return 'Phant({})'.format(', '.join(['{}: {}'.format(k, v)
+                                            for (k, v) in self._jsonKeys.items()
+                                            ])
+                                  )
+
     def __str__(self):
-        return json.dumps(self._jsonKeys,
-                          indent=4)
+        return 'Phant@{}'.format(self.publicKey)
 
     def inputUrl(self, extension='.json'):
         return self._jsonKeys['inputUrl'] + extension
