@@ -1,8 +1,8 @@
 from setuptools import setup, find_packages
 from os import path
 
-# Read version                                                                                    
-execfile('phant/version.py')
+# Read version
+from phant.version import __version__
 
 here = path.abspath(path.dirname(__file__))
 
@@ -16,4 +16,5 @@ setup(
     url='http://github.com/matze/python-phant',
     packages=['phant', 'phant.encoders'],
     install_requires=['requests'],
+    test_suite="tests",
 )

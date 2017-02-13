@@ -1,8 +1,9 @@
+from . import encoders
+
 import sys
 import datetime
 import requests
 import logging
-import encoders
 import json
 
 if sys.version_info[0] < 3:
@@ -65,9 +66,14 @@ class Phant(object):
         self._stats = None
         self._last_headers = None
 
+    def __repr__(self):
+        return 'Phant({})'.format(', '.join(['{}: {}'.format(k, v)
+                                            for (k, v) in self._jsonKeys.items()
+                                            ])
+                                  )
+
     def __str__(self):
-        return json.dumps(self._jsonKeys,
-                          indent=4)
+        return 'Phant@{}'.format(self.publicKey)
 
     def inputUrl(self, extension='.json'):
         return self._jsonKeys['inputUrl'] + extension
@@ -105,7 +111,7 @@ class Phant(object):
             },
             check=False
         )
-        return map(lambda x: x.strip(), response.json()['message'].split('expecting:')[1].split(','))
+        return list(map(lambda x: x.strip(), response.json()['message'].split('expecting:')[1].split(',')))
 
     def _check_response(self, response):
         '''
@@ -285,8 +291,8 @@ class Phant(object):
                     timestamp = timestamp[:-6]
                 entry['timestamp'] = datetime.datetime.strptime(
                     timestamp, pattern)
-        response = map(lambda r: {k: self._encoder.deserialize(k, v)
-                                  for k, v in r.items()}, response)
+        response = list(map(lambda r: {k: self._encoder.deserialize(k, v)
+                                  for k, v in r.items()}, response))
         if sort_by:
             if sort_by not in self.extended_fields:
                 raise ValueError("Field \'{}\' not in the known list of fields: {}".format(
