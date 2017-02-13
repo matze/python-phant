@@ -111,7 +111,7 @@ class Phant(object):
             },
             check=False
         )
-        return map(lambda x: x.strip(), response.json()['message'].split('expecting:')[1].split(','))
+        return list(map(lambda x: x.strip(), response.json()['message'].split('expecting:')[1].split(',')))
 
     def _check_response(self, response):
         '''
@@ -291,8 +291,8 @@ class Phant(object):
                     timestamp = timestamp[:-6]
                 entry['timestamp'] = datetime.datetime.strptime(
                     timestamp, pattern)
-        response = map(lambda r: {k: self._encoder.deserialize(k, v)
-                                  for k, v in r.items()}, response)
+        response = list(map(lambda r: {k: self._encoder.deserialize(k, v)
+                                  for k, v in r.items()}, response))
         if sort_by:
             if sort_by not in self.extended_fields:
                 raise ValueError("Field \'{}\' not in the known list of fields: {}".format(
